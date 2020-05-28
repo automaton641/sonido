@@ -73,31 +73,83 @@ fn cpal() {
     });
 }
 */
-fn append_square_wave(samples: &mut Vec<f32>, wave_length: f32) {
-    for index in 0..wave_length as u32 {
-        if index < (wave_length / 2.0) as u32 {
-            samples.push(-1.0)
+fn write_square_wave_raw(samples: &mut Vec<f32>, wave_length: f32, sample_index: &mut f32) {
+    for wave_index in 0..wave_length as u32 {
+        if (*sample_index as usize) < samples.len() {
+            if wave_index < (wave_length / 2.0) as u32 {
+                samples[*sample_index as usize] += -1.0;
+            } else {
+                samples[*sample_index as usize] += 1.0;
+            }
         } else {
-            samples.push(1.0)
+            if wave_index < (wave_length / 2.0) as u32 {
+                samples.push(-1.0)
+            } else {
+                samples.push(1.0)
+            }
         }
+        *sample_index += 1.0;
     }
 }
 
-fn append_square_wave_freq(samples: &mut Vec<f32>, frequency: f32, seconds: f32, sample_rate: f32) {
+fn write_square_wave_freq(
+    samples: &mut Vec<f32>,
+    frequency: f32,
+    seconds: f32,
+    pointer: f32,
+    sample_rate: f32,
+) {
     let peroid: f32 = 1.0 / frequency;
     let wave_length: f32 = peroid * sample_rate;
     let samples_count: f32 = seconds * sample_rate;
-    let waves_count: f32 = (samples_count/ wave_length).ceil();
+    let waves_count: f32 = (samples_count / wave_length).ceil();
+    let mut sample_index: f32 = pointer * sample_rate;
     for _index in 0..waves_count as u32 {
-        append_square_wave(samples, wave_length);
+        write_square_wave_raw(samples, wave_length, &mut sample_index);
     }
+}
 
+fn write_square_wave(
+    samples: &mut Vec<f32>,
+    note: f32,
+    seconds: f32,
+    pointer: f32,
+    sample_rate: f32,
+) {
+    let frequency: f32 = 440.0 * ((2.0 as f32).powf(note / 12.0));
+    write_square_wave_freq(samples, frequency, seconds, pointer, sample_rate);
+}
+
+fn find_max(samples: &mut Vec<f32>) -> f32 {
+    let mut max: f32 = 0.0;
+    for sample in samples {
+        let abs = (*sample).abs();
+        if max < abs {
+            max = abs;
+        }
+    }
+    return max;
+}
+
+fn normalize(samples: &mut Vec<f32>) {
+    let max = find_max(samples);
+    if max == 0.0 {
+        return;
+    }
+    let normalizer = 1.0 / max;
+    for sample in samples {
+        *sample *= normalizer;
+    }
 }
 
 fn main() {
     let sample_rate: f32 = 48000.0;
     let mut samples: Vec<f32> = Vec::new();
-    append_square_wave_freq(&mut samples, 16.0, 8.0, sample_rate);
+    let mut pointer: f32 = 0.0;
+    write_square_wave(&mut samples, -24.0, 4.0, pointer, sample_rate);
+    pointer += 4.0;
+    write_square_wave(&mut samples, -24.0 + 6.0, 4.0, pointer, sample_rate);
+    normalize(&mut samples);
     let spec = hound::WavSpec {
         channels: 1,
         sample_rate: sample_rate as u32,
